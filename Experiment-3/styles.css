@@ -1,0 +1,3 @@
+body { font-family: Arial; padding: 20px; }
+    .product { border: 1px solid #ccc; padding: 10px; margin: 5px 0; }
+    .no-results { color: red; font-weight: bold; }
