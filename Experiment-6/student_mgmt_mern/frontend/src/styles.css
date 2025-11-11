@@ -1,0 +1,10 @@
+body { font-family: Arial, Helvetica, sans-serif; margin:0; padding:0; background:#f7f7f7; color:#222; }
+.container { max-width:900px; margin:0 auto; padding:20px; }
+header { background:#2b6cb0; color:white; padding:15px 20px; margin-bottom:20px; }
+header a { color:white; text-decoration:none; }
+nav a { color: #e6eefc; margin-left:10px; }
+table.students { width:100%; border-collapse:collapse; background:white; }
+table.students th, table.students td { padding:8px 12px; border:1px solid #ddd; text-align:left; }
+.form label { display:block; margin-bottom:8px; }
+.form input { padding:8px; width:100%; max-width:400px; box-sizing:border-box; margin-top:4px; }
+.form button { margin-top:10px; padding:8px 12px; }
