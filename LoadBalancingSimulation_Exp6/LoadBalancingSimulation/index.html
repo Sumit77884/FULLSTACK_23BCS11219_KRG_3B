@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Load Balancing Simulation | Sumit Kumar</title>
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet"/>
+  <style>
+    :root {
+      --bg: #050a0f;
+      --panel: #0a1520;
+      --border: #0ff3;
+      --green: #00ff88;
+      --cyan: #00e5ff;
+      --red: #ff3b5c;
+      --yellow: #ffd600;
+      --dim: #334;
+      --text: #c8e6f0;
+      --font-mono: 'Share Tech Mono', monospace;
+      --font-head: 'Orbitron', sans-serif;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-mono);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* Grid background */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(0,229,255,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,229,255,0.03) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 30px 20px;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Header */
+    header {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+    header h1 {
+      font-family: var(--font-head);
+      font-size: clamp(1.2rem, 3vw, 2rem);
+      color: var(--cyan);
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      text-shadow: 0 0 20px var(--cyan);
+    }
+    header p {
+      margin-top: 6px;
+      font-size: 0.8rem;
+      color: #557;
+      letter-spacing: 2px;
+    }
+    .badge {
+      display: inline-block;
+      margin-top: 10px;
+      background: #0a1a2a;
+      border: 1px solid var(--cyan);
+      color: var(--cyan);
+      font-size: 0.7rem;
+      padding: 3px 12px;
+      border-radius: 2px;
+      letter-spacing: 1px;
+    }
+
+    /* Experiment Tabs */
+    .tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+    .tab-btn {
+      font-family: var(--font-mono);
+      background: var(--panel);
+      border: 1px solid var(--border);
+      color: #557;
+      padding: 8px 18px;
+      cursor: pointer;
+      font-size: 0.78rem;
+      letter-spacing: 1px;
+      transition: all 0.2s;
+      text-transform: uppercase;
+    }
+    .tab-btn:hover { color: var(--cyan); border-color: var(--cyan); }
+    .tab-btn.active { color: var(--cyan); border-color: var(--cyan); background: #061828; box-shadow: 0 0 12px #00e5ff33; }
+
+    /* Panel */
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      padding: 20px;
+      margin-bottom: 18px;
+      position: relative;
+    }
+    .panel::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--cyan), transparent);
+    }
+    .panel-title {
+      font-family: var(--font-head);
+      font-size: 0.7rem;
+      color: var(--cyan);
+      letter-spacing: 3px;
+      margin-bottom: 16px;
+      text-transform: uppercase;
+    }
+
+    /* Server Cards */
+    .servers-grid {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
+    }
+    .server-card {
+      flex: 1;
+      min-width: 140px;
+      background: #061018;
+      border: 1px solid var(--dim);
+      padding: 12px;
+      position: relative;
+      transition: all 0.4s;
+    }
+    .server-card.healthy { border-color: var(--green); }
+    .server-card.failed  { border-color: var(--red); opacity: 0.7; }
+    .server-card.new-server { border-color: var(--yellow); animation: newPulse 1s ease 3; }
+    @keyframes newPulse {
+      0%,100% { box-shadow: 0 0 0 var(--yellow); }
+      50% { box-shadow: 0 0 16px var(--yellow); }
+    }
+    .server-name {
+      font-family: var(--font-head);
+      font-size: 0.65rem;
+      letter-spacing: 2px;
+      margin-bottom: 8px;
+    }
+    .server-card.healthy .server-name { color: var(--green); }
+    .server-card.failed  .server-name { color: var(--red); }
+    .server-card.new-server .server-name { color: var(--yellow); }
+    .server-status {
+      font-size: 0.65rem;
+      padding: 2px 7px;
+      display: inline-block;
+      margin-bottom: 8px;
+      border-radius: 2px;
+    }
+    .server-card.healthy .server-status { background: #00ff8820; color: var(--green); border: 1px solid var(--green); }
+    .server-card.failed  .server-status { background: #ff3b5c20; color: var(--red);   border: 1px solid var(--red); }
+    .server-card.new-server .server-status { background: #ffd60020; color: var(--yellow); border: 1px solid var(--yellow); }
+    .server-stat { font-size: 0.68rem; color: #667; margin-top: 3px; }
+    .server-stat span { color: var(--text); }
+
+    /* Load bar */
+    .load-bar-wrap { margin-top: 8px; height: 4px; background: #112; border-radius: 2px; overflow: hidden; }
+    .load-bar { height: 100%; border-radius: 2px; transition: width 1s ease; }
+    .server-card.healthy .load-bar { background: var(--green); }
+    .server-card.failed  .load-bar { background: var(--red); }
+    .server-card.new-server .load-bar { background: var(--yellow); }
+
+    /* Request packets animation */
+    .traffic-lane {
+      position: relative;
+      height: 38px;
+      background: #060e18;
+      border: 1px solid #0a2030;
+      margin-bottom: 12px;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      padding: 0 10px;
+    }
+    .traffic-label { font-size: 0.65rem; color: #445; letter-spacing: 1px; white-space: nowrap; z-index: 2; }
+    .packet {
+      position: absolute;
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      top: 50%; transform: translateY(-50%);
+      animation: movePacket linear forwards;
+    }
+    @keyframes movePacket {
+      from { left: 5%; opacity: 1; }
+      to   { left: 95%; opacity: 0.2; }
+    }
+
+    /* Metrics row */
+    .metrics-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+      gap: 10px;
+      margin: 14px 0;
+    }
+    .metric-box {
+      background: #060e18;
+      border: 1px solid var(--dim);
+      padding: 12px 14px;
+      text-align: center;
+    }
+    .metric-label { font-size: 0.6rem; color: #445; letter-spacing: 1px; margin-bottom: 6px; text-transform: uppercase; }
+    .metric-value { font-family: var(--font-head); font-size: 1.1rem; }
+    .metric-value.good { color: var(--green); }
+    .metric-value.warn { color: var(--yellow); }
+    .metric-value.bad  { color: var(--red); }
+
+    /* Live log */
+    .log-box {
+      background: #03080d;
+      border: 1px solid #0a1e2e;
+      padding: 12px;
+      height: 130px;
+      overflow-y: auto;
+      font-size: 0.7rem;
+      line-height: 1.8;
+    }
+    .log-box::-webkit-scrollbar { width: 4px; }
+    .log-box::-webkit-scrollbar-thumb { background: var(--cyan); border-radius: 2px; }
+    .log-line { display: block; }
+    .log-line.info  { color: var(--cyan); }
+    .log-line.good  { color: var(--green); }
+    .log-line.warn  { color: var(--yellow); }
+    .log-line.error { color: var(--red); }
+    .log-line.dim   { color: #446; }
+
+    /* Controls */
+    .controls { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; align-items: center; }
+    .btn {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      letter-spacing: 1px;
+      padding: 9px 22px;
+      border: 1px solid;
+      cursor: pointer;
+      text-transform: uppercase;
+      transition: all 0.2s;
+      background: transparent;
+    }
+    .btn-start { border-color: var(--green); color: var(--green); }
+    .btn-start:hover { background: var(--green); color: #000; box-shadow: 0 0 14px var(--green); }
+    .btn-start:disabled { border-color: #334; color: #334; cursor: not-allowed; background: transparent; box-shadow: none; }
+    .btn-reset { border-color: #557; color: #557; }
+    .btn-reset:hover { border-color: var(--cyan); color: var(--cyan); }
+
+    .speed-label { font-size: 0.68rem; color: #446; }
+    .speed-label input { accent-color: var(--cyan); }
+
+    /* Progress bar */
+    .progress-wrap { background: #07111a; border: 1px solid var(--dim); height: 6px; margin-bottom: 14px; overflow: hidden; }
+    .progress-bar { height: 100%; background: linear-gradient(90deg, var(--cyan), var(--green)); width: 0%; transition: width 0.3s; }
+
+    /* Chart */
+    .chart-wrap { margin-top: 10px; }
+    .chart-title { font-size: 0.62rem; color: #446; letter-spacing: 2px; margin-bottom: 6px; }
+    .bar-chart { display: flex; align-items: flex-end; gap: 6px; height: 80px; padding: 0 4px; }
+    .bar-col { display: flex; flex-direction: column; align-items: center; flex: 1; height: 100%; justify-content: flex-end; }
+    .bar { width: 100%; border-radius: 2px 2px 0 0; transition: height 0.6s ease; min-height: 2px; }
+    .bar-val { font-size: 0.55rem; color: #557; margin-top: 3px; }
+    .bar-name { font-size: 0.5rem; color: #335; margin-top: 2px; text-align: center; }
+
+    /* Experiment content */
+    .exp-content { display: none; }
+    .exp-content.active { display: block; }
+
+    /* Comparison table */
+    .cmp-table { width: 100%; border-collapse: collapse; font-size: 0.72rem; margin-top: 10px; }
+    .cmp-table th { color: var(--cyan); border-bottom: 1px solid #0a2030; padding: 7px 10px; text-align: left; letter-spacing: 1px; font-weight: normal; font-size: 0.65rem; }
+    .cmp-table td { padding: 7px 10px; border-bottom: 1px solid #07111a; color: var(--text); }
+    .cmp-table tr:hover td { background: #07111a; }
+    .cmp-table .highlight { color: var(--green); font-weight: bold; }
+
+    /* Glitch effect on title */
+    @keyframes glitch {
+      0%,95%,100% { text-shadow: 0 0 20px var(--cyan); transform: none; }
+      96% { text-shadow: 3px 0 var(--red), -3px 0 var(--green); transform: skewX(2deg); }
+      98% { text-shadow: -3px 0 var(--red), 3px 0 var(--green); transform: skewX(-1deg); }
+    }
+    header h1 { animation: glitch 6s infinite; }
+
+    .section-label {
+      font-size: 0.6rem;
+      letter-spacing: 3px;
+      color: #334;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+
+    .divider { border: none; border-top: 1px solid #0a1e2e; margin: 16px 0; }
+
+    /* Fault event box */
+    .event-box {
+      border: 1px solid var(--red);
+      background: #1a0510;
+      padding: 10px 14px;
+      font-size: 0.72rem;
+      color: var(--red);
+      margin: 12px 0;
+      display: none;
+    }
+    .event-box.show { display: block; animation: fadeIn 0.4s; }
+    .recovery-box {
+      border: 1px solid var(--yellow);
+      background: #1a1200;
+      padding: 10px 14px;
+      font-size: 0.72rem;
+      color: var(--yellow);
+      margin: 12px 0;
+      display: none;
+    }
+    .recovery-box.show { display: block; animation: fadeIn 0.4s; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+
+    /* Responsive */
+    @media(max-width:600px) {
+      .servers-grid { flex-direction: column; }
+      .metrics-row { grid-template-columns: repeat(2,1fr); }
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <h1>Load Balancing Simulation</h1>
+    <p>EXPERIMENT 6 &nbsp;|&nbsp; SYSTEM DESIGN &nbsp;|&nbsp; 23CSH-314</p>
+    <span class="badge">Sumit Kumar &nbsp;·&nbsp; 23BCS11219 &nbsp;·&nbsp; B.E-CSE SEC 609/A</span>
+  </header>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab-btn active" onclick="showExp(1)">EXP 1 — Single Server</button>
+    <button class="tab-btn" onclick="showExp(2)">EXP 2 — Horizontal Scaling</button>
+    <button class="tab-btn" onclick="showExp(4)">EXP 4 — Fault Tolerance</button>
+    <button class="tab-btn" onclick="showExp(5)">📊 Comparison</button>
+  </div>
+
+  <!-- ======================== EXP 1 ======================== -->
+  <div class="exp-content active" id="exp1">
+    <div class="panel">
+      <div class="panel-title">Experiment 1 — Baseline: Single Server</div>
+      <p class="section-label">Server Pool Status · Load Balancer: Round Robin</p>
+      <div class="servers-grid" id="e1-servers">
+        <div class="server-card healthy" id="e1-s1">
+          <div class="server-name">SERVER-1</div>
+          <span class="server-status">HEALTHY</span>
+          <div class="server-stat">Active Requests: <span id="e1-s1-active">0</span></div>
+          <div class="server-stat">Avg RT: <span id="e1-s1-rt">0.00ms</span></div>
+          <div class="load-bar-wrap"><div class="load-bar" id="e1-s1-bar" style="width:0%"></div></div>
+        </div>
+      </div>
+
+      <div class="traffic-lane" id="e1-lane">
+        <span class="traffic-label">REQUEST TRAFFIC &nbsp;▶</span>
+      </div>
+
+      <hr class="divider"/>
+      <div class="controls">
+        <button class="btn btn-start" id="e1-btn" onclick="runExp1()">▶ Start Simulation</button>
+        <button class="btn btn-reset" onclick="resetExp(1)">↺ Reset</button>
+        <span class="speed-label">Speed: <input type="range" id="e1-speed" min="1" max="5" value="3"> </span>
+      </div>
+
+      <div class="progress-wrap"><div class="progress-bar" id="e1-progress"></div></div>
+
+      <div class="metrics-row">
+        <div class="metric-box"><div class="metric-label">Throughput</div><div class="metric-value good" id="e1-throughput">—</div></div>
+        <div class="metric-box"><div class="metric-label">Avg Response</div><div class="metric-value warn" id="e1-rt">—</div></div>
+        <div class="metric-box"><div class="metric-label">Success Rate</div><div class="metric-value good" id="e1-success">—</div></div>
+        <div class="metric-box"><div class="metric-label">Failed Req.</div><div class="metric-value bad" id="e1-failed">—</div></div>
+      </div>
+
+      <div class="chart-title">THROUGHPUT OVER TIME (req/s)</div>
+      <div class="bar-chart" id="e1-chart"></div>
+
+      <hr class="divider"/>
+      <div class="section-label">Live Log</div>
+      <div class="log-box" id="e1-log"></div>
+    </div>
+  </div>
+
+  <!-- ======================== EXP 2 ======================== -->
+  <div class="exp-content" id="exp2">
+    <div class="panel">
+      <div class="panel-title">Experiment 2 — Horizontal Scaling: 3 Servers</div>
+      <p class="section-label">Server Pool Status · Load Balancer: Round Robin</p>
+      <div class="servers-grid" id="e2-servers">
+        <div class="server-card healthy" id="e2-s1">
+          <div class="server-name">SERVER-1</div>
+          <span class="server-status">HEALTHY</span>
+          <div class="server-stat">Active: <span id="e2-s1-active">0</span></div>
+          <div class="server-stat">Avg RT: <span id="e2-s1-rt">0.00ms</span></div>
+          <div class="load-bar-wrap"><div class="load-bar" id="e2-s1-bar" style="width:0%"></div></div>
+        </div>
+        <div class="server-card healthy" id="e2-s2">
+          <div class="server-name">SERVER-2</div>
+          <span class="server-status">HEALTHY</span>
+          <div class="server-stat">Active: <span id="e2-s2-active">0</span></div>
+          <div class="server-stat">Avg RT: <span id="e2-s2-rt">0.00ms</span></div>
+          <div class="load-bar-wrap"><div class="load-bar" id="e2-s2-bar" style="width:0%"></div></div>
+        </div>
+        <div class="server-card healthy" id="e2-s3">
+          <div class="server-name">SERVER-3</div>
+          <span class="server-status">HEALTHY</span>
+          <div class="server-stat">Active: <span id="e2-s3-active">0</span></div>
+          <div class="server-stat">Avg RT: <span id="e2-s3-rt">0.00ms</span></div>
+          <div class="load-bar-wrap"><div class="load-bar" id="e2-s3-bar" style="width:0%"></div></div>
+        </div>
+      </div>
+
+      <div class="traffic-lane" id="e2-lane">
+        <span class="traffic-label">REQUEST TRAFFIC &nbsp;▶</span>
+      </div>
+
+      <hr class="divider"/>
+      <div class="controls">
+        <button class="btn btn-start" id="e2-btn" onclick="runExp2()">▶ Start Simulation</button>
+        <button class="btn btn-reset" onclick="resetExp(2)">↺ Reset</button>
+        <span class="speed-label">Speed: <input type="range" id="e2-speed" min="1" max="5" value="3"></span>
+      </div>
+
+      <div class="progress-wrap"><div class="progress-bar" id="e2-progress"></div></div>
+
+      <div class="metrics-row">
+        <div class="metric-box"><div class="metric-label">Throughput</div><div class="metric-value good" id="e2-throughput">—</div></div>
+        <div class="metric-box"><div class="metric-label">Avg Response</div><div class="metric-value good" id="e2-rt">—</div></div>
+        <div class="metric-box"><div class="metric-label">Success Rate</div><div class="metric-value good" id="e2-success">—</div></div>
+        <div class="metric-box"><div class="metric-label">Failed Req.</div><div class="metric-value good" id="e2-failed">—</div></div>
+      </div>
+
+      <div class="chart-title">THROUGHPUT OVER TIME (req/s) — ROUND ROBIN DISTRIBUTION</div>
+      <div class="bar-chart" id="e2-chart"></div>
+
+      <hr class="divider"/>
+      <div class="section-label">Live Log</div>
+      <div class="log-box" id="e2-log"></div>
+    </div>
+  </div>
+
+  <!-- ======================== EXP 4 ======================== -->
+  <div class="exp-content" id="exp4">
+    <div class="panel">
+      <div class="panel-title">Experiment 4 — Fault Tolerance: Server Failure & Recovery</div>
+      <p class="section-label">Server Pool Status · Load Balancer: Round Robin</p>
+      <div class="servers-grid" id="e4-servers">
+        <div class="server-card healthy" id="e4-s1">
+          <div class="server-name">SERVER-1</div>
+          <span class="server-status">HEALTHY</span>
+          <div class="server-stat">Active: <span id="e4-s1-active">0</span></div>
+          <div class="server-stat">Avg RT: <span id="e4-s1-rt">0.00ms</span></div>
+          <div class="load-bar-wrap"><div class="load-bar" id="e4-s1-bar" style="width:0%"></div></div>
+        </div>
+        <div class="server-card healthy" id="e4-s2">
+          <div class="server-name">SERVER-2</div>
+          <span class="server-status" id="e4-s2-status">HEALTHY</span>
+          <div class="server-stat">Active: <span id="e4-s2-active">0</span></div>
+          <div class="server-stat">Avg RT: <span id="e4-s2-rt">0.00ms</span></div>
+          <div class="load-bar-wrap"><div class="load-bar" id="e4-s2-bar" style="width:0%"></div></div>
+        </div>
+        <div class="server-card healthy" id="e4-s3">
+          <div class="server-name">SERVER-3</div>
+          <span class="server-status">HEALTHY</span>
+          <div class="server-stat">Active: <span id="e4-s3-active">0</span></div>
+          <div class="server-stat">Avg RT: <span id="e4-s3-rt">0.00ms</span></div>
+          <div class="load-bar-wrap"><div class="load-bar" id="e4-s3-bar" style="width:0%"></div></div>
+        </div>
+        <div class="server-card new-server" id="e4-s4" style="display:none">
+          <div class="server-name">SERVER-4</div>
+          <span class="server-status">NEW</span>
+          <div class="server-stat">Active: <span id="e4-s4-active">0</span></div>
+          <div class="server-stat">Avg RT: <span id="e4-s4-rt">0.00ms</span></div>
+          <div class="load-bar-wrap"><div class="load-bar" id="e4-s4-bar" style="width:0%"></div></div>
+        </div>
+      </div>
+
+      <div class="event-box" id="e4-crash-box">⚠ SERVER-2 CRASHED — Redistributing traffic to Server-1 and Server-3</div>
+      <div class="recovery-box" id="e4-recovery-box">✔ SERVER-4 added to pool — System recovering...</div>
+
+      <div class="traffic-lane" id="e4-lane">
+        <span class="traffic-label">REQUEST TRAFFIC &nbsp;▶</span>
+      </div>
+
+      <hr class="divider"/>
+      <div class="controls">
+        <button class="btn btn-start" id="e4-btn" onclick="runExp4()">▶ Start Simulation</button>
+        <button class="btn btn-reset" onclick="resetExp(4)">↺ Reset</button>
+        <span class="speed-label">Speed: <input type="range" id="e4-speed" min="1" max="5" value="3"></span>
+      </div>
+
+      <div class="progress-wrap"><div class="progress-bar" id="e4-progress"></div></div>
+
+      <div class="metrics-row">
+        <div class="metric-box"><div class="metric-label">Throughput</div><div class="metric-value good" id="e4-throughput">—</div></div>
+        <div class="metric-box"><div class="metric-label">Avg Response</div><div class="metric-value warn" id="e4-rt">—</div></div>
+        <div class="metric-box"><div class="metric-label">Success Rate</div><div class="metric-value good" id="e4-success">—</div></div>
+        <div class="metric-box"><div class="metric-label">Phase</div><div class="metric-value warn" id="e4-phase">—</div></div>
+      </div>
+
+      <div class="chart-title">THROUGHPUT OVER TIME — SERVER FAILURE AT ~40%</div>
+      <div class="bar-chart" id="e4-chart"></div>
+
+      <hr class="divider"/>
+      <div class="section-label">Live Log</div>
+      <div class="log-box" id="e4-log"></div>
+    </div>
+  </div>
+
+  <!-- ======================== COMPARISON ======================== -->
+  <div class="exp-content" id="exp5">
+    <div class="panel">
+      <div class="panel-title">📊 Comparison — All Experiments</div>
+      <table class="cmp-table">
+        <thead>
+          <tr>
+            <th>Metric</th>
+            <th>Exp 1 — Single Server</th>
+            <th>Exp 2 — 3 Servers</th>
+            <th>Exp 4 — Fault Tolerance</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Total Servers</td><td>1</td><td>3</td><td>3 → 4 (auto)</td></tr>
+          <tr><td>Total Requests</td><td>1425</td><td>2980</td><td>~2600</td></tr>
+          <tr><td>Successful Requests</td><td>1398</td><td>2965</td><td>2561</td></tr>
+          <tr><td>Failed Requests</td><td>27</td><td>15</td><td>39</td></tr>
+          <tr><td>Success Rate</td><td>98.11%</td><td class="highlight">99.50%</td><td>98.45%</td></tr>
+          <tr><td>Avg Throughput</td><td>47.50 req/s</td><td class="highlight">99.33 req/s</td><td>~85–120 req/s</td></tr>
+          <tr><td>Avg Response Time</td><td>89.25 ms</td><td class="highlight">26.85 ms</td><td>~32–45 ms</td></tr>
+          <tr><td>Max Response Time</td><td>245.60 ms</td><td class="highlight">102.30 ms</td><td>~180 ms</td></tr>
+          <tr><td>Server Failure?</td><td>No</td><td>No</td><td>Yes (Server-2)</td></tr>
+          <tr><td>Auto Recovery?</td><td>N/A</td><td>N/A</td><td class="highlight">Yes (40s)</td></tr>
+        </tbody>
+      </table>
+      <hr class="divider"/>
+      <div class="panel-title" style="margin-top:10px">Key Observations</div>
+      <div style="font-size:0.75rem;line-height:2;color:#88aacc;">
+        <span style="color:var(--green)">▶</span> Horizontal scaling (Exp 2) gave <strong style="color:var(--cyan)">2× more throughput</strong> and <strong style="color:var(--cyan)">3× faster response</strong> vs single server.<br>
+        <span style="color:var(--green)">▶</span> Round Robin distributes load evenly — no single server gets overloaded.<br>
+        <span style="color:var(--green)">▶</span> Even after Server-2 crashed in Exp 4, system recovered by adding Server-4 automatically.<br>
+        <span style="color:var(--yellow)">▶</span> Fault tolerance caused a temporary dip in throughput (125 → 85 req/s) before recovery.<br>
+        <span style="color:var(--cyan)">▶</span> Stateless servers allow easy horizontal scaling — no session data tied to one machine.
+      </div>
+    </div>
+  </div>
+
+</div><!-- end container -->
+
+<script>
+// ========== Helpers ==========
+function log(id, msg, cls='info') {
+  const box = document.getElementById(id+'-log');
+  if (!box) return;
+  const line = document.createElement('span');
+  line.className = 'log-line ' + cls;
+  line.textContent = '> ' + msg;
+  box.appendChild(line);
+  box.appendChild(document.createElement('br'));
+  box.scrollTop = box.scrollHeight;
+}
+
+function setMetric(id, val) { const el=document.getElementById(id); if(el) el.textContent=val; }
+
+function addBar(chartId, val, max, color, label) {
+  const chart = document.getElementById(chartId);
+  if (!chart) return;
+  const col = document.createElement('div');
+  col.className = 'bar-col';
+  const pct = Math.min(100, (val/max)*100);
+  col.innerHTML = `<div class="bar" style="height:${pct}%;background:${color}"></div>
+    <div class="bar-val">${val}</div>
+    <div class="bar-name">${label}</div>`;
+  chart.appendChild(col);
+}
+
+function spawnPacket(laneId, color) {
+  const lane = document.getElementById(laneId);
+  if (!lane) return;
+  const p = document.createElement('div');
+  p.className = 'packet';
+  p.style.background = color;
+  p.style.left = '5%';
+  const speed = (Math.random()*1.5+0.8).toFixed(1);
+  p.style.animationDuration = speed + 's';
+  lane.appendChild(p);
+  setTimeout(() => p.remove(), parseFloat(speed)*1000 + 100);
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function getSpeed(id) {
+  const v = parseInt(document.getElementById(id+'-speed').value);
+  return [2000,1400,900,500,200][v-1];
+}
+
+function showExp(n) {
+  document.querySelectorAll('.exp-content').forEach(e => e.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(e => e.classList.remove('active'));
+  const id = n===5 ? 'exp5' : 'exp'+n;
+  document.getElementById(id).classList.add('active');
+  document.querySelectorAll('.tab-btn')[n===5?3:n-1].classList.add('active');
+}
+
+function resetExp(n) {
+  location.reload();
+}
+
+// ========== EXP 1 ==========
+async function runExp1() {
+  const btn = document.getElementById('e1-btn');
+  btn.disabled = true;
+  const spd = getSpeed('e1');
+  const colors = ['#00ff88'];
+
+  log('e1','[INIT] Single server mode activated','info');
+  await sleep(spd*0.5);
+  log('e1','[INFO] Load Balancer: Round Robin','dim');
+  log('e1','[INFO] Total Servers: 1','dim');
+  await sleep(spd*0.5);
+  log('e1','[START] Load Test — 10 concurrent users, 30s','info');
+
+  const throughputs = [43,45,47,46,48,50,47,49,46,45];
+  const rts = [90,88,86,91,89,85,92,87,90,88];
+  let totalReq = 0, failed = 0;
+
+  for (let i = 0; i < throughputs.length; i++) {
+    const pct = ((i+1)/throughputs.length)*100;
+    document.getElementById('e1-progress').style.width = pct+'%';
+
+    const active = Math.floor(Math.random()*8)+3;
+    document.getElementById('e1-s1-active').textContent = active;
+    document.getElementById('e1-s1-rt').textContent = rts[i]+'ms';
+    document.getElementById('e1-s1-bar').style.width = (active*10)+'%';
+
+    for (let p=0;p<3;p++) spawnPacket('e1-lane', colors[0]);
+    addBar('e1-chart', throughputs[i], 150, '#00ff88', 't'+(i+1));
+
+    const f = Math.random()<0.02 ? 1 : 0;
+    failed += f; totalReq += throughputs[i];
+    log('e1',`[Live] Throughput: ${throughputs[i]} req/s | Avg RT: ${rts[i]}ms | Success: ${f?'97.5':'98.8'}%`, f?'warn':'good');
+    setMetric('e1-throughput', throughputs[i]+' req/s');
+    setMetric('e1-rt', rts[i]+' ms');
+    setMetric('e1-success', f?'97.5%':'98.8%');
+    setMetric('e1-failed', failed);
+    await sleep(spd);
+  }
+
+  document.getElementById('e1-progress').style.width = '100%';
+  document.getElementById('e1-s1-active').textContent = 0;
+  document.getElementById('e1-s1-bar').style.width = '0%';
+  await sleep(spd*0.3);
+  log('e1','--- LOAD TEST COMPLETE ---','info');
+  log('e1','Total Requests: 1425','dim');
+  log('e1','Successful: 1398 | Failed: 27','warn');
+  log('e1','Avg Throughput: 47.50 req/s','good');
+  log('e1','Avg Response Time: 89.25ms','warn');
+  log('e1','Success Rate: 98.11%','good');
+  setMetric('e1-throughput','47.50 req/s');
+  setMetric('e1-rt','89.25 ms');
+  setMetric('e1-success','98.11%');
+  setMetric('e1-failed','27');
+}
+
+// ========== EXP 2 ==========
+async function runExp2() {
+  const btn = document.getElementById('e2-btn');
+  btn.disabled = true;
+  const spd = getSpeed('e2');
+  const colors = ['#00ff88','#00e5ff','#ffd600'];
+
+  log('e2','[INIT] Horizontal Scaling — 3 servers','info');
+  log('e2','[+] Added Server-1 to pool','good');
+  await sleep(spd*0.3);
+  log('e2','[+] Added Server-2 to pool','good');
+  await sleep(spd*0.3);
+  log('e2','[+] Added Server-3 to pool','good');
+  await sleep(spd*0.5);
+  log('e2','[INFO] Load Balancer distributing via Round Robin','dim');
+  log('e2','[START] Load Test — 10 concurrent users, 30s','info');
+
+  const throughputs = [125,130,132,138,140,136,139,135,138,140];
+  const rts = [30,28,27,26,25,27,26,28,25,26];
+  const serverIds = ['e2-s1','e2-s2','e2-s3'];
+
+  for (let i = 0; i < throughputs.length; i++) {
+    const pct = ((i+1)/throughputs.length)*100;
+    document.getElementById('e2-progress').style.width = pct+'%';
+
+    // Round-robin assign
+    const server = serverIds[i % 3];
+    const active = [Math.floor(Math.random()*10)+8, Math.floor(Math.random()*10)+8, Math.floor(Math.random()*10)+8];
+    for (let s=0;s<3;s++) {
+      document.getElementById('e2-s'+(s+1)+'-active').textContent = active[s];
+      document.getElementById('e2-s'+(s+1)+'-rt').textContent = (rts[i]+Math.floor(Math.random()*4)-2)+'ms';
+      document.getElementById('e2-s'+(s+1)+'-bar').style.width = (active[s]*5)+'%';
+    }
+
+    for (let p=0;p<6;p++) spawnPacket('e2-lane', colors[p%3]);
+    addBar('e2-chart', throughputs[i], 160, colors[i%3], 't'+(i+1));
+
+    log('e2',`[Live] Throughput: ${throughputs[i]} req/s | Avg RT: ${rts[i]}ms | Success: 99.${3+i%3}%`,'good');
+    setMetric('e2-throughput', throughputs[i]+' req/s');
+    setMetric('e2-rt', rts[i]+' ms');
+    setMetric('e2-success', '99.'+((3+i)%5)+'%');
+    setMetric('e2-failed', Math.floor(i*0.5));
+    await sleep(spd);
+  }
+
+  document.getElementById('e2-progress').style.width = '100%';
+  for(let s=1;s<=3;s++){
+    document.getElementById('e2-s'+s+'-active').textContent = 0;
+    document.getElementById('e2-s'+s+'-bar').style.width = '0%';
+  }
+  await sleep(spd*0.3);
+  log('e2','--- LOAD TEST COMPLETE ---','info');
+  log('e2','Total Requests: 2980 | Successful: 2965 | Failed: 15','good');
+  log('e2','Avg Throughput: 99.33 req/s','good');
+  log('e2','Avg Response Time: 26.85ms  ← 3× faster than single server!','good');
+  log('e2','Success Rate: 99.50%','good');
+  setMetric('e2-throughput','99.33 req/s');
+  setMetric('e2-rt','26.85 ms');
+  setMetric('e2-success','99.50%');
+  setMetric('e2-failed','15');
+}
+
+// ========== EXP 4 ==========
+async function runExp4() {
+  const btn = document.getElementById('e4-btn');
+  btn.disabled = true;
+  const spd = getSpeed('e4');
+
+  log('e4','[INIT] Fault Tolerance test — 3 servers active','info');
+  log('e4','[START] Load Test beginning...','info');
+
+  const phase1 = [125,128,127,130];
+  const phase2 = [88,82,85,80];
+  const phase3 = [105,112,118,121];
+
+  // Phase 1: Normal
+  setMetric('e4-phase','NORMAL');
+  for (let i=0;i<phase1.length;i++) {
+    document.getElementById('e4-progress').style.width = ((i+1)/12*100)+'%';
+    const actives = [15,18,16];
+    for(let s=1;s<=3;s++){
+      document.getElementById('e4-s'+s+'-active').textContent = actives[s-1];
+      document.getElementById('e4-s'+s+'-rt').textContent = (30+Math.random()*5).toFixed(1)+'ms';
+      document.getElementById('e4-s'+s+'-bar').style.width = (actives[s-1]*4)+'%';
+    }
+    for(let p=0;p<5;p++) spawnPacket('e4-lane','#00ff88');
+    addBar('e4-chart', phase1[i], 140, '#00ff88', 'N'+(i+1));
+    log('e4',`[Live] Throughput: ${phase1[i]} req/s | Avg RT: ${(30+i).toFixed(0)}ms | Success: 99.1%`,'good');
+    setMetric('e4-throughput', phase1[i]+' req/s');
+    setMetric('e4-rt', (30+i)+'ms');
+    setMetric('e4-success','99.1%');
+    await sleep(spd);
+  }
+
+  // CRASH
+  await sleep(spd*0.4);
+  log('e4','[!] Simulating Server-2 failure...','error');
+  await sleep(spd*0.3);
+  log('e4','[-] SERVER-2 CRASHED!','error');
+  document.getElementById('e4-crash-box').classList.add('show');
+
+  const s2card = document.getElementById('e4-s2');
+  s2card.className = 'server-card failed';
+  s2card.querySelector('.server-status').textContent = 'FAILED';
+  document.getElementById('e4-s2-active').textContent = 0;
+  document.getElementById('e4-s2-bar').style.width = '0%';
+  setMetric('e4-phase','FAILURE');
+
+  // Phase 2: Degraded
+  for (let i=0;i<phase2.length;i++) {
+    document.getElementById('e4-progress').style.width = ((4+i+1)/12*100)+'%';
+    const actives = [22,0,24];
+    for(let s=1;s<=3;s++){
+      document.getElementById('e4-s'+s+'-active').textContent = actives[s-1];
+      if(s!==2) {
+        document.getElementById('e4-s'+s+'-rt').textContent = (45+Math.random()*5).toFixed(1)+'ms';
+        document.getElementById('e4-s'+s+'-bar').style.width = (actives[s-1]*3.5)+'%';
+      }
+    }
+    for(let p=0;p<3;p++) spawnPacket('e4-lane','#ff3b5c');
+    addBar('e4-chart', phase2[i], 140, '#ff3b5c', 'F'+(i+1));
+    log('e4',`[Live] Throughput: ${phase2[i]} req/s | Avg RT: ${(45+i*2)}ms | Success: 97.${i}%`,'warn');
+    setMetric('e4-throughput', phase2[i]+' req/s');
+    setMetric('e4-rt', (45+i*2)+'ms');
+    setMetric('e4-success','97.'+i+'%');
+    await sleep(spd);
+  }
+
+  // Recovery
+  await sleep(spd*0.4);
+  log('e4','[+] Adding new server to replace failed one...','warn');
+  await sleep(spd*0.3);
+  log('e4','[+] SERVER-4 added to pool!','good');
+  document.getElementById('e4-s4').style.display = 'block';
+  document.getElementById('e4-recovery-box').classList.add('show');
+  setMetric('e4-phase','RECOVERY');
+
+  // Phase 3: Recovering
+  for (let i=0;i<phase3.length;i++) {
+    document.getElementById('e4-progress').style.width = ((8+i+1)/12*100)+'%';
+    const actives = [14,0,16,10];
+    for(let s=1;s<=3;s++){
+      document.getElementById('e4-s'+s+'-active').textContent = actives[s-1];
+      if(s!==2){
+        document.getElementById('e4-s'+s+'-rt').textContent = (35+Math.random()*5).toFixed(1)+'ms';
+        document.getElementById('e4-s'+s+'-bar').style.width = (actives[s-1]*4)+'%';
+      }
+    }
+    document.getElementById('e4-s4-active').textContent = actives[3];
+    document.getElementById('e4-s4-rt').textContent = (35+Math.random()*3).toFixed(1)+'ms';
+    document.getElementById('e4-s4-bar').style.width = (actives[3]*5)+'%';
+
+    for(let p=0;p<5;p++) spawnPacket('e4-lane','#ffd600');
+    addBar('e4-chart', phase3[i], 140, '#ffd600', 'R'+(i+1));
+    log('e4',`[Live] Throughput: ${phase3[i]} req/s | Avg RT: ${(38-i*2)}ms | Success: 98.${i+5}%`,'good');
+    setMetric('e4-throughput', phase3[i]+' req/s');
+    setMetric('e4-rt', (38-i*2)+'ms');
+    setMetric('e4-success','98.'+((i+5))+'%');
+    await sleep(spd);
+  }
+
+  document.getElementById('e4-progress').style.width = '100%';
+  log('e4','--- FAULT TOLERANCE RESULTS ---','info');
+  log('e4','Final Success Rate: 98.45%','good');
+  log('e4','System recovered after ~40 seconds','good');
+  log('e4','Simulation Completed Successfully','good');
+  setMetric('e4-phase','RECOVERED ✔');
+}
+</script>
+</body>
+</html>
